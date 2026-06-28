@@ -7,8 +7,8 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: 'Closed-Test Promo Code Distributor',
-  description: 'Securely authenticate and claim unique promo codes for closed beta testing programs.',
+  title: 'Promo Code Distributor',
+  description: 'Securely authenticate and claim unique promo codes for promotions, giveaways, and beta tests.',
 };
 
 export default function RootLayout({ children }) {

@@ -1,6 +1,6 @@
-# Closed-Test Promo Code Distributor (Next.js + Vercel Postgres)
+# Promo Code Distributor (Next.js + Vercel Postgres)
 
-A single-page web application to distribute promo codes to closed beta testers.
+An admin console and landing page to manage and distribute promo codes for promotions, giveaways, and beta tests using Google OAuth verification.
 
 ## Features
 
