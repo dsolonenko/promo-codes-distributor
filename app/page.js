@@ -109,12 +109,14 @@ export default function Home() {
       
       if (data.user) {
         if (data.user.isDeveloper) {
-          await loadAdminDashboardData('default');
+          await initializeAdminDashboard();
         } else {
           // Resolve current distribution slug from URL query params
           const searchParams = new URLSearchParams(window.location.search);
           const currentDist = searchParams.get('dist') || 'default';
-          await checkOrClaimCode(currentDist);
+          if (currentDist !== 'default') {
+            await checkOrClaimCode(currentDist);
+          }
         }
       }
     } catch (err) {
@@ -125,22 +127,48 @@ export default function Home() {
   };
 
   // 2. Fetch Developer Dashboard States
+  const initializeAdminDashboard = async () => {
+    try {
+      const res = await fetch('/api/admin/stats');
+      const data = await res.json();
+      if (res.ok) {
+        const stats = data.stats || [];
+        setCampaignsStats(stats);
+        if (stats.length > 0) {
+          const firstCampaign = stats[0].dist_slug;
+          setSelectedDist(firstCampaign);
+          await fetchClaimedCodes(firstCampaign);
+        } else {
+          setSelectedDist('');
+          setClaimsList([]);
+        }
+      } else {
+        showToast(data.error || 'Failed to load statistics.', 'error');
+      }
+    } catch (err) {
+      showToast('Network error loading admin stats.', 'error');
+    }
+  };
+
   const loadAdminDashboardData = async (distSlug) => {
+    if (!distSlug) {
+      setSelectedDist('');
+      setClaimsList([]);
+      return;
+    }
     setSelectedDist(distSlug);
     await Promise.all([
-      fetchAdminStats(distSlug),
+      fetchAdminStats(),
       fetchClaimedCodes(distSlug)
     ]);
   };
 
-  const fetchAdminStats = async (currentDist) => {
+  const fetchAdminStats = async () => {
     try {
       const res = await fetch('/api/admin/stats');
       const data = await res.json();
       if (res.ok) {
         setCampaignsStats(data.stats || []);
-        // If the selected distribution is not in the stats array (meaning it's a new empty one),
-        // we keep the UI local state, otherwise we read it from stats.
       } else {
         showToast(data.error || 'Failed to load statistics.', 'error');
       }
@@ -581,25 +609,27 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
                       cursor: 'pointer'
                     }}
                   >
-                    {/* Ensure default is always present */}
-                    {campaignsStats.every(s => s.dist_slug !== 'default') && (
-                      <option value="default">{getFriendlyName('default')}</option>
+                    {campaignsStats.length === 0 ? (
+                      <option value="">No campaigns created</option>
+                    ) : (
+                      campaignsStats.map(s => (
+                        <option key={s.dist_slug} value={s.dist_slug}>
+                          {getFriendlyName(s.dist_slug)}
+                        </option>
+                      ))
                     )}
-                    {campaignsStats.map(s => (
-                      <option key={s.dist_slug} value={s.dist_slug}>
-                        {getFriendlyName(s.dist_slug)}
-                      </option>
-                    ))}
                   </select>
 
-                  <button 
-                    onClick={copyCampaignUrl} 
-                    className="btn btn-secondary" 
-                    style={{ padding: '0.5rem 0.85rem', fontSize: '0.8rem' }}
-                    title="Copy unguessable URL for this campaign"
-                  >
-                    🔗 Copy Campaign Link
-                  </button>
+                  {selectedDist && (
+                    <button 
+                      onClick={copyCampaignUrl} 
+                      className="btn btn-secondary" 
+                      style={{ padding: '0.5rem 0.85rem', fontSize: '0.8rem' }}
+                      title="Copy unguessable URL for this campaign"
+                    >
+                      🔗 Copy Campaign Link
+                    </button>
+                  )}
                 </div>
 
                 <button 
@@ -643,116 +673,129 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
               )}
 
               {/* Display copyable link helper */}
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', wordBreak: 'break-all' }}>
-                <strong>Share URL: </strong> 
-                <code style={{ color: 'var(--accent)' }}>
-                  {isMounted ? `${window.location.origin}/?dist=${selectedDist}` : `/?dist=${selectedDist}`}
-                </code>
-              </div>
-            </div>
-
-            {/* Campaign Counters */}
-            <div className="stats-grid">
-              <div className="stat-card total">
-                <span className="stat-label">Total Uploaded Codes</span>
-                <span className="stat-value">{activeStat.total}</span>
-              </div>
-              <div className="stat-card claimed">
-                <span className="stat-label">Claimed Codes</span>
-                <span className="stat-value">{activeStat.claimed}</span>
-              </div>
-              <div className="stat-card remaining">
-                <span className="stat-label">Remaining Codes</span>
-                <span className="stat-value">{activeStat.remaining}</span>
-              </div>
-            </div>
-
-            <div className="dev-panels">
-              {/* Left Panel: CSV importer */}
-              <div className="card">
-                <div className="panel-header">
-                  <h2>Import Codes for "{getFriendlyName(selectedDist)}"</h2>
-                  {activeStat.total > 0 && (
-                    <button onClick={handleClear} className="btn btn-danger btn-sm" disabled={actionLoading}>
-                      Clear Campaign
-                    </button>
-                  )}
+              {selectedDist && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', wordBreak: 'break-all' }}>
+                  <strong>Share URL: </strong> 
+                  <code style={{ color: 'var(--accent)' }}>
+                    {isMounted ? `${window.location.origin}/?dist=${selectedDist}` : `/?dist=${selectedDist}`}
+                  </code>
                 </div>
-                
-                <div 
-                  className={`upload-area ${dragActive ? 'dragover' : ''}`}
-                  onDragEnter={handleDrag}
-                  onDragOver={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <input 
-                    type="file" 
-                    id="csv-file" 
-                    accept=".csv,.txt" 
-                    ref={fileInputRef}
-                    onChange={(e) => e.target.files && handleFile(e.target.files[0])}
-                    disabled={actionLoading}
-                    style={{ display: 'none' }}
-                  />
-                  <div className="upload-icon">📥</div>
-                  <div className="upload-text">
-                    <span>Click to upload</span> or drag and drop
+              )}
+            </div>
+
+            {selectedDist ? (
+              <>
+                {/* Campaign Counters */}
+                <div className="stats-grid">
+                  <div className="stat-card total">
+                    <span className="stat-label">Total Uploaded Codes</span>
+                    <span className="stat-value">{activeStat.total}</span>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Accepts CSV or TXT exports from Google Play</div>
+                  <div className="stat-card claimed">
+                    <span className="stat-label">Claimed Codes</span>
+                    <span className="stat-value">{activeStat.claimed}</span>
+                  </div>
+                  <div className="stat-card remaining">
+                    <span className="stat-label">Remaining Codes</span>
+                    <span className="stat-value">{activeStat.remaining}</span>
+                  </div>
                 </div>
 
-                <div className="divider">Or paste codes manually</div>
-
-                <div className="paste-area">
-                  <textarea 
-                    value={pasteInput}
-                    onChange={(e) => setPasteInput(e.target.value)}
-                    placeholder="Paste codes here (one per line, e.g. A1B2C3D4...)" 
-                    disabled={actionLoading}
-                  />
-                  <button onClick={handlePasteSubmit} className="btn btn-primary" disabled={actionLoading}>
-                    {actionLoading ? 'Uploading...' : 'Process & Upload'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Right Panel: Claims list log */}
-              <div className="card">
-                <div className="panel-header">
-                  <h2>Distribution Log</h2>
-                  <span className="user-email" style={{ fontSize: '0.75rem' }}>{claimsList.length} Claimed</span>
-                </div>
-                
-                <div className="table-wrapper">
-                  <table className="claims-table">
-                    <thead>
-                      <tr>
-                        <th>Email Address</th>
-                        <th>Assigned Code</th>
-                        <th>Claim Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {claimsList.length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="table-empty">No promo codes claimed for this campaign yet.</td>
-                        </tr>
-                      ) : (
-                        claimsList.map((row, index) => (
-                          <tr key={index}>
-                            <td className="email-cell" title={row.claimed_by_email}>{row.claimed_by_email}</td>
-                            <td className="code-cell">{row.code}</td>
-                            <td className="time-cell">{new Date(row.claimed_at).toLocaleDateString()}</td>
-                          </tr>
-                        ))
+                <div className="dev-panels">
+                  {/* Left Panel: CSV importer */}
+                  <div className="card">
+                    <div className="panel-header">
+                      <h2>Import Codes for "{getFriendlyName(selectedDist)}"</h2>
+                      {activeStat.total > 0 && (
+                        <button onClick={handleClear} className="btn btn-danger btn-sm" disabled={actionLoading}>
+                          Clear Campaign
+                        </button>
                       )}
-                    </tbody>
-                  </table>
+                    </div>
+                    
+                    <div 
+                      className={`upload-zone ${dragActive ? 'active' : ''}`}
+                      onDragEnter={handleDrag}
+                      onDragOver={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                    >
+                      <input 
+                        ref={fileInputRef}
+                        type="file" 
+                        accept=".csv,.txt"
+                        onChange={(e) => e.target.files && handleFile(e.target.files[0])}
+                        disabled={actionLoading}
+                        style={{ display: 'none' }}
+                      />
+                      <div className="upload-icon">📥</div>
+                      <div className="upload-text">
+                        <span>Click to upload</span> or drag and drop
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Accepts CSV or TXT exports from Google Play</div>
+                    </div>
+
+                    <div className="divider">Or paste codes manually</div>
+
+                    <div className="paste-area">
+                      <textarea 
+                        value={pasteInput}
+                        onChange={(e) => setPasteInput(e.target.value)}
+                        placeholder="Paste codes here (one per line, e.g. A1B2C3D4...)" 
+                        disabled={actionLoading}
+                      />
+                      <button onClick={handlePasteSubmit} className="btn btn-primary" disabled={actionLoading}>
+                        {actionLoading ? 'Uploading...' : 'Process & Upload'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right Panel: Claims list log */}
+                  <div className="card">
+                    <div className="panel-header">
+                      <h2>Distribution Log</h2>
+                      <span className="user-email" style={{ fontSize: '0.75rem' }}>{claimsList.length} Claimed</span>
+                    </div>
+                    
+                    <div className="table-wrapper">
+                      <table className="claims-table">
+                        <thead>
+                          <tr>
+                            <th>Email Address</th>
+                            <th>Assigned Code</th>
+                            <th>Claim Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {claimsList.length === 0 ? (
+                            <tr>
+                              <td colSpan={3} className="table-empty">No promo codes claimed for this campaign yet.</td>
+                            </tr>
+                          ) : (
+                            claimsList.map((row, index) => (
+                              <tr key={index}>
+                                <td className="email-cell" title={row.claimed_by_email}>{row.claimed_by_email}</td>
+                                <td className="code-cell">{row.code}</td>
+                                <td className="time-cell">{new Date(row.claimed_at).toLocaleDateString()}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
+              </>
+            ) : (
+              <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', marginTop: '1.5rem' }}>
+                <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>📋</div>
+                <h2>No Active Campaign</h2>
+                <p style={{ marginTop: '0.5rem', fontSize: '0.95rem' }}>
+                  Create a new campaign using the <strong>Create New Campaign</strong> button above to start importing and distributing promo codes.
+                </p>
               </div>
-            </div>
+            )}
           </div>
           {renderFooter('Developer Panel')}
         </>
