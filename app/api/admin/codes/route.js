@@ -1,93 +1,65 @@
 import { NextResponse } from 'next/server';
 import { decryptSession } from '@/lib/auth';
-import { sql } from '@vercel/postgres';
+import { getClaimedCodesLogic, uploadCodesLogic, clearCampaignLogic } from '@/lib/logic';
 
-// helper to check developer auth
-function checkDevAuth(request) {
+function getAuthUser(request) {
   const sessionCookie = request.cookies.get('auth_session')?.value;
-  const user = decryptSession(sessionCookie);
-
-  if (!user) return { error: 'Unauthorized', status: 401 };
-
-  const devEmails = (process.env.DEVELOPER_EMAILS || '')
-    .split(',')
-    .map(e => e.trim().toLowerCase());
-  const isDeveloper = devEmails.includes(user.email.toLowerCase());
-
-  if (!isDeveloper) {
-    return { error: 'Access Denied: Admin privileges required.', status: 403 };
-  }
-
-  return { user };
+  return decryptSession(sessionCookie);
 }
 
-// GET: Get all claimed codes details
+// GET: Get all claimed codes details for a specific campaign distribution
 export async function GET(request) {
-  const auth = checkDevAuth(request);
-  if (auth.error) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const user = getAuthUser(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const dist = searchParams.get('dist') || 'default';
+
   try {
-    const listRes = await sql`
-      SELECT code, claimed_by_email, claimed_at 
-      FROM promo_codes 
-      WHERE claimed_by_email IS NOT NULL 
-      ORDER BY claimed_at DESC;
-    `;
-    return NextResponse.json({ claims: listRes.rows });
+    const result = await getClaimedCodesLogic(user.email, dist);
+    return NextResponse.json(result);
   } catch (err) {
     console.error('Fetch Claimed Codes Error:', err);
-    return NextResponse.json({ error: 'Failed to fetch claimed codes: ' + err.message }, { status: 500 });
+    const status = err.message.includes('Forbidden') ? 403 : 500;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }
 
-// POST: Bulk upload codes
+// POST: Bulk upload codes for a specific campaign distribution
 export async function POST(request) {
-  const auth = checkDevAuth(request);
-  if (auth.error) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const user = getAuthUser(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const { codes } = await request.json();
-    if (!Array.isArray(codes) || codes.length === 0) {
-      return NextResponse.json({ error: 'Invalid payload: Expecting a non-empty array of codes.' }, { status: 400 });
-    }
-
-    // Clean codes list
-    const cleanCodes = codes.map(c => String(c).trim()).filter(Boolean);
-    if (cleanCodes.length === 0) {
-      return NextResponse.json({ error: 'No valid codes provided after cleaning.' }, { status: 400 });
-    }
-
-    // Perform bulk insert
-    await sql`
-      INSERT INTO promo_codes (code)
-      SELECT unnest(${cleanCodes}::text[])
-      ON CONFLICT (code) DO NOTHING;
-    `;
-
-    return NextResponse.json({ success: true, count: cleanCodes.length });
+    const { dist, codes } = await request.json();
+    const result = await uploadCodesLogic(user.email, dist, codes);
+    return NextResponse.json(result);
   } catch (err) {
     console.error('Bulk Upload Error:', err);
-    return NextResponse.json({ error: 'Failed to upload codes: ' + err.message }, { status: 500 });
+    const status = err.message.includes('Forbidden') ? 403 : err.message.includes('Invalid') ? 400 : 500;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }
 
-// DELETE: Reset all codes and claims
+// DELETE: Reset all codes and claims for a specific campaign distribution
 export async function DELETE(request) {
-  const auth = checkDevAuth(request);
-  if (auth.error) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const user = getAuthUser(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    await sql`DELETE FROM promo_codes;`;
-    return NextResponse.json({ success: true });
+    const { dist } = await request.json();
+    const result = await clearCampaignLogic(user.email, dist);
+    return NextResponse.json(result);
   } catch (err) {
     console.error('Purge Codes Error:', err);
-    return NextResponse.json({ error: 'Failed to reset database: ' + err.message }, { status: 500 });
+    const status = err.message.includes('Forbidden') ? 403 : err.message.includes('Missing') ? 400 : 500;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }
 export const dynamic = 'force-dynamic';

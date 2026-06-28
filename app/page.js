@@ -1,18 +1,24 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { extractCodesFromText } from '@/lib/csv';
 
 export default function Home() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [configMissing, setConfigMissing] = useState(false);
   const [claimedCode, setClaimedCode] = useState(null);
-  const [stats, setStats] = useState({ total: 0, claimed: 0, remaining: 0 });
+  
+  // Developer statistics lists and filters
+  const [campaignsStats, setCampaignsStats] = useState([]);
+  const [selectedDist, setSelectedDist] = useState('default');
   const [claimsList, setClaimsList] = useState([]);
   
   const [actionLoading, setActionLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [pasteInput, setPasteInput] = useState('');
+  const [newCampaignName, setNewCampaignName] = useState('');
+  const [showCreateInput, setShowCreateInput] = useState(false);
   const [toasts, setToasts] = useState([]);
   
   const fileInputRef = useRef(null);
@@ -26,7 +32,32 @@ export default function Home() {
     }, 4000);
   };
 
-  // 1. Session check on mount
+  // Helper: Format slugs back into friendly campaign titles for UI rendering
+  const getFriendlyName = (slug) => {
+    if (!slug) return '';
+    if (slug === 'default') return 'Default Pool';
+    const parts = slug.split('-');
+    if (parts.length > 1) {
+      parts.pop(); // remove random hash suffix
+    }
+    return parts
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  // Helper: Generate safe, unguessable slugs with random hash suffixes
+  const generateUnguessableSlug = (name) => {
+    const slugified = name
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '') // remove special characters
+      .replace(/[\s_]+/g, '-')  // replace spaces/underscores with hyphens
+      .replace(/^-+|-+$/g, '');  // trim leading/trailing hyphens
+    const hash = Math.random().toString(36).substring(2, 8); // 6 character random hash
+    return `${slugified}-${hash}`;
+  };
+
+  // 1. Session check and routing on mount
   useEffect(() => {
     fetchSession();
   }, []);
@@ -46,9 +77,12 @@ export default function Home() {
       
       if (data.user) {
         if (data.user.isDeveloper) {
-          await Promise.all([fetchAdminStats(), fetchClaimedCodes()]);
+          await loadAdminDashboardData('default');
         } else {
-          await checkOrClaimCode();
+          // Resolve current distribution slug from URL query params
+          const searchParams = new URLSearchParams(window.location.search);
+          const currentDist = searchParams.get('dist') || 'default';
+          await checkOrClaimCode(currentDist);
         }
       }
     } catch (err) {
@@ -58,25 +92,34 @@ export default function Home() {
     }
   };
 
-  // 2. Fetch Developer Stats
-  const fetchAdminStats = async () => {
+  // 2. Fetch Developer Dashboard States
+  const loadAdminDashboardData = async (distSlug) => {
+    setSelectedDist(distSlug);
+    await Promise.all([
+      fetchAdminStats(distSlug),
+      fetchClaimedCodes(distSlug)
+    ]);
+  };
+
+  const fetchAdminStats = async (currentDist) => {
     try {
       const res = await fetch('/api/admin/stats');
       const data = await res.json();
       if (res.ok) {
-        setStats(data.stats);
+        setCampaignsStats(data.stats || []);
+        // If the selected distribution is not in the stats array (meaning it's a new empty one),
+        // we keep the UI local state, otherwise we read it from stats.
       } else {
-        showToast(data.error || 'Failed to load stats.', 'error');
+        showToast(data.error || 'Failed to load statistics.', 'error');
       }
     } catch (err) {
       showToast('Network error loading admin stats.', 'error');
     }
   };
 
-  // 3. Fetch Claims Log
-  const fetchClaimedCodes = async () => {
+  const fetchClaimedCodes = async (distSlug) => {
     try {
-      const res = await fetch('/api/admin/codes');
+      const res = await fetch(`/api/admin/codes?dist=${encodeURIComponent(distSlug)}`);
       const data = await res.json();
       if (res.ok) {
         setClaimsList(data.claims || []);
@@ -88,10 +131,14 @@ export default function Home() {
     }
   };
 
-  // 4. Claim Code for standard user
-  const checkOrClaimCode = async () => {
+  // 3. Claim Code for standard user
+  const checkOrClaimCode = async (distSlug) => {
     try {
-      const res = await fetch('/api/claim', { method: 'POST' });
+      const res = await fetch('/api/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dist: distSlug })
+      });
       const data = await res.json();
       if (res.ok) {
         setClaimedCode(data.code);
@@ -103,19 +150,19 @@ export default function Home() {
     }
   };
 
-  // 5. Bulk upload new codes
-  const handleUpload = async (codes) => {
+  // 4. Bulk upload new codes for the active campaign
+  const handleUpload = async (codes, targetDist = selectedDist) => {
     setActionLoading(true);
     try {
       const res = await fetch('/api/admin/codes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codes }),
+        body: JSON.stringify({ dist: targetDist, codes }),
       });
       const data = await res.json();
       if (res.ok) {
         showToast(`Successfully uploaded ${data.count} codes!`, 'success');
-        await Promise.all([fetchAdminStats(), fetchClaimedCodes()]);
+        await loadAdminDashboardData(targetDist);
       } else {
         showToast(data.error || 'Upload failed.', 'error');
       }
@@ -126,16 +173,21 @@ export default function Home() {
     }
   };
 
-  // 6. Purge / Clear all codes
+  // 5. Purge / Clear codes for the active campaign
   const handleClear = async () => {
-    if (!confirm('Are you absolutely sure you want to delete ALL promo codes and claim records? This cannot be undone.')) return;
+    const campaignName = getFriendlyName(selectedDist);
+    if (!confirm(`Are you absolutely sure you want to delete ALL promo codes and claim records for "${campaignName}"? This cannot be undone.`)) return;
+    
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/codes', { method: 'DELETE' });
+      const res = await fetch('/api/admin/codes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dist: selectedDist })
+      });
       if (res.ok) {
-        showToast('All codes and claims have been cleared.', 'success');
-        setStats({ total: 0, claimed: 0, remaining: 0 });
-        setClaimsList([]);
+        showToast(`All codes for "${campaignName}" have been cleared.`, 'success');
+        await loadAdminDashboardData(selectedDist);
       } else {
         const data = await res.json();
         showToast(data.error || 'Purge failed.', 'error');
@@ -147,29 +199,54 @@ export default function Home() {
     }
   };
 
-  // ============================================================================
-  // CSV Importer Parsing
-  // ============================================================================
-  const extractCodesFromText = (text) => {
-    const lines = text.split(/\r?\n/);
-    const codes = new Set();
-    
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const cells = line.split(/[,\t;]/).map(c => c.replace(/^["']|["']$/g, '').trim());
-      
-      for (const cell of cells) {
-        // Collect alphanumeric promo codes between 8 and 30 characters
-        if (cell.length >= 8 && cell.length <= 30 && /^[A-Z0-9_\-]+$/i.test(cell)) {
-          const upper = cell.toUpperCase();
-          if (upper !== 'CODE' && upper !== 'PROMO' && upper !== 'PROMOCODE' && upper !== 'PROMOTION') {
-            codes.add(cell);
-          }
-        }
-      }
+  // 6. Create new campaign
+  const handleCreateCampaign = () => {
+    if (!newCampaignName.trim()) {
+      showToast('Please type a campaign name.', 'error');
+      return;
     }
-    return Array.from(codes);
+    const slug = generateUnguessableSlug(newCampaignName);
+    
+    // Add temporary client stat to dropdown so we can select it
+    setCampaignsStats(prev => [
+      ...prev,
+      { dist_slug: slug, total: 0, claimed: 0, remaining: 0 }
+    ]);
+    
+    setSelectedDist(slug);
+    setClaimsList([]);
+    setNewCampaignName('');
+    setShowCreateInput(false);
+    showToast(`Campaign created! Share URL suffix: ?dist=${slug}`, 'success');
   };
+
+  const handleDemoLogin = async (email) => {
+    setActionLoading(true);
+    try {
+      const res = await fetch('/api/auth/demo-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      if (res.ok) {
+        showToast(`Logged in as ${email}!`, 'success');
+        setConfigMissing(false);
+        setLoading(true);
+        await fetchSession();
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Demo login failed.', 'error');
+      }
+    } catch (err) {
+      showToast('Network error during demo login.', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ============================================================================
+  // File Importer & Parsing Logic
+  // ============================================================================
 
   const handleFile = (file) => {
     const reader = new FileReader();
@@ -214,17 +291,22 @@ export default function Home() {
     setPasteInput('');
   };
 
-  const copyToClipboard = (text) => {
+  const copyToClipboard = (text, message = 'Copied to clipboard!') => {
     navigator.clipboard.writeText(text)
-      .then(() => showToast('Promo code copied!', 'success'))
+      .then(() => showToast(message, 'success'))
       .catch(() => showToast('Failed to copy.', 'error'));
+  };
+
+  const copyCampaignUrl = () => {
+    const fullUrl = `${window.location.origin}/?dist=${selectedDist}`;
+    copyToClipboard(fullUrl, 'Unguessable campaign link copied!');
   };
 
   // ============================================================================
   // Views Renders
   // ============================================================================
 
-  // 1. Loading screen
+  // 1. Loading state screen
   if (loading) {
     return (
       <div className="container">
@@ -236,7 +318,7 @@ export default function Home() {
     );
   }
 
-  // 2. Config Missing Alert Screen
+  // 2. Environment configuration missing screen
   if (configMissing) {
     return (
       <div className="container">
@@ -245,18 +327,30 @@ export default function Home() {
             <div className="empty-state">
               <div className="empty-icon">⚠️</div>
               <h1 style={{ marginBottom: '1rem' }}>Configuration Required</h1>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.4', marginBottom: '1.5rem' }}>
                 Vercel Postgres (<code>POSTGRES_URL</code>) or Google OAuth (<code>GOOGLE_CLIENT_ID</code>) is missing. 
-                If you just clicked "1-Click Deploy", make sure the database is provisioned and your Google OAuth Credentials are saved in the project environment variables.
+                If you just clicked "1-Click Deploy", make sure the database is provisioned and your credentials are configured.
               </p>
               <pre style={{ background: 'rgba(0,0,0,0.4)', padding: '1rem', borderRadius: 'var(--radius-sm)', textAlign: 'left', fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--accent)', overflowX: 'auto', marginBottom: '1.5rem' }}>
 GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-client-secret
 DEVELOPER_EMAILS=your-email@gmail.com
 JWT_SECRET=your-custom-jwt-secret-key</pre>
-              <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-                Restart your application server once environment variables are set.
-              </p>
+
+              <div style={{ margin: '2rem 0 0.5rem 0', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Or Run in Demo Mode (Zero-Config)</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+                  No database setup or Google credentials required. Instantly test the app locally using a persistent file-based database.
+                </p>
+                <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+                  <button onClick={() => handleDemoLogin('admin@example.com')} className="btn btn-primary" style={{ width: '100%' }} disabled={actionLoading}>
+                    ⚡ Log in as Admin (admin@example.com)
+                  </button>
+                  <button onClick={() => handleDemoLogin('tester@example.com')} className="btn btn-secondary" style={{ width: '100%' }} disabled={actionLoading}>
+                    👤 Log in as Tester (tester@example.com)
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -272,6 +366,11 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
         <div className="brand">
           <div className="brand-icon">📦</div>
           <span className="brand-title">Code Distributor</span>
+          {user.demoMode && (
+            <span className="user-email" style={{ borderColor: 'var(--warning)', color: 'var(--warning)', marginLeft: '0.75rem', fontSize: '0.7rem', padding: '0.2rem 0.5rem', fontWeight: 'bold' }}>
+              ⚠️ DEMO MODE
+            </span>
+          )}
         </div>
         <div className="user-nav">
           <span className="user-email">{user.email}</span>
@@ -281,7 +380,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
     );
   };
 
-  // 4. Toast Render Container
+  // 4. Toast Alerts
   const renderToasts = () => (
     <div className="toast-container">
       {toasts.map((t) => (
@@ -295,13 +394,17 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
     </div>
   );
 
+  // Active Statistics mapping for currently selected campaign
+  const activeStat = campaignsStats.find(s => s.dist_slug === selectedDist) || { total: 0, claimed: 0, remaining: 0 };
+  const userRequestedDist = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('dist') || 'default' : 'default';
+
   return (
     <div className="container">
       {renderHeader()}
       {renderToasts()}
 
       {!user ? (
-        /* Landing View */
+        /* Landing Page View */
         <>
           <div className="landing-container">
             <div className="hero-text">
@@ -350,29 +453,122 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
         /* Developer Dashboard View */
         <>
           <div className="dev-container">
+            {/* Top Workspace Selector Row */}
+            <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <label htmlFor="campaign-select" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    Active Campaign:
+                  </label>
+                  <select 
+                    id="campaign-select"
+                    value={selectedDist}
+                    onChange={(e) => loadAdminDashboardData(e.target.value)}
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.4)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '0.5rem 1.5rem 0.5rem 0.75rem',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {/* Ensure default is always present */}
+                    {campaignsStats.every(s => s.dist_slug !== 'default') && (
+                      <option value="default">{getFriendlyName('default')}</option>
+                    )}
+                    {campaignsStats.map(s => (
+                      <option key={s.dist_slug} value={s.dist_slug}>
+                        {getFriendlyName(s.dist_slug)}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button 
+                    onClick={copyCampaignUrl} 
+                    className="btn btn-secondary" 
+                    style={{ padding: '0.5rem 0.85rem', fontSize: '0.8rem' }}
+                    title="Copy unguessable URL for this campaign"
+                  >
+                    🔗 Copy Campaign Link
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => setShowCreateInput(!showCreateInput)} 
+                  className="btn btn-primary"
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                >
+                  {showCreateInput ? 'Cancel' : '➕ Create New Campaign'}
+                </button>
+              </div>
+
+              {/* Create new campaign toggle input */}
+              {showCreateInput && (
+                <div style={{
+                  display: 'flex',
+                  gap: '0.75rem',
+                  padding: '1rem 0 0.5rem 0',
+                  borderTop: '1px solid var(--border)',
+                  animation: 'slideIn 0.15s forwards'
+                }}>
+                  <input 
+                    type="text"
+                    value={newCampaignName}
+                    onChange={(e) => setNewCampaignName(e.target.value)}
+                    placeholder="E.g. Alpha Wave 1"
+                    style={{
+                      flex: 1,
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '0.5rem 0.75rem',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      fontSize: '0.9rem'
+                    }}
+                  />
+                  <button onClick={handleCreateCampaign} className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
+                    Generate Slug
+                  </button>
+                </div>
+              )}
+
+              {/* Display copyable link helper */}
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', wordBreak: 'break-all' }}>
+                <strong>Share URL: </strong> 
+                <code style={{ color: 'var(--accent)' }}>
+                  {typeof window !== 'undefined' ? `${window.location.origin}/?dist=${selectedDist}` : `/?dist=${selectedDist}`}
+                </code>
+              </div>
+            </div>
+
+            {/* Campaign Counters */}
             <div className="stats-grid">
               <div className="stat-card total">
                 <span className="stat-label">Total Uploaded Codes</span>
-                <span className="stat-value">{stats.total}</span>
+                <span className="stat-value">{activeStat.total}</span>
               </div>
               <div className="stat-card claimed">
                 <span className="stat-label">Claimed Codes</span>
-                <span className="stat-value">{stats.claimed}</span>
+                <span className="stat-value">{activeStat.claimed}</span>
               </div>
               <div className="stat-card remaining">
                 <span className="stat-label">Remaining Codes</span>
-                <span className="stat-value">{stats.remaining}</span>
+                <span className="stat-value">{activeStat.remaining}</span>
               </div>
             </div>
 
             <div className="dev-panels">
-              {/* Left Panel: Upload codes */}
+              {/* Left Panel: CSV importer */}
               <div className="card">
                 <div className="panel-header">
-                  <h2>Import Promo Codes</h2>
-                  {stats.total > 0 && (
+                  <h2>Import Codes for "{getFriendlyName(selectedDist)}"</h2>
+                  {activeStat.total > 0 && (
                     <button onClick={handleClear} className="btn btn-danger btn-sm" disabled={actionLoading}>
-                      Clear Data
+                      Clear Campaign
                     </button>
                   )}
                 </div>
@@ -416,7 +612,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
                 </div>
               </div>
 
-              {/* Right Panel: Distribution Records */}
+              {/* Right Panel: Claims list log */}
               <div className="card">
                 <div className="panel-header">
                   <h2>Distribution Log</h2>
@@ -435,7 +631,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
                     <tbody>
                       {claimsList.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="table-empty">No promo codes have been claimed yet.</td>
+                          <td colSpan={3} className="table-empty">No promo codes claimed for this campaign yet.</td>
                         </tr>
                       ) : (
                         claimsList.map((row, index) => (
@@ -468,14 +664,16 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
                 <>
                   <div className="claim-header">
                     <h1>Claim Success!</h1>
-                    <p>Your unique testing promo code has been allocated below.</p>
+                    <p style={{ marginTop: '0.5rem' }}>
+                      Your testing promo code for <strong>"{getFriendlyName(userRequestedDist)}"</strong> is allocated below.
+                    </p>
                   </div>
                   
                   <div className="claim-box">
                     <span className="claim-label">Google Play Promo Code</span>
                     <div className="promo-code-display">{claimedCode}</div>
                     <div className="claim-actions">
-                      <button onClick={() => copyToClipboard(claimedCode)} className="btn btn-secondary">Copy Code</button>
+                      <button onClick={() => copyToClipboard(claimedCode, 'Promo code copied!')} className="btn btn-secondary">Copy Code</button>
                       <a href={`https://play.google.com/store?code=${claimedCode}`} target="_blank" className="btn btn-primary">Redeem Code</a>
                     </div>
                   </div>
@@ -494,7 +692,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
                   <div className="empty-icon">⚠️</div>
                   <h2>No Promo Codes Available</h2>
                   <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', lineHeight: '1.5' }}>
-                    All promo codes for this testing session have already been allocated. 
+                    All promo codes for the campaign <strong>"{getFriendlyName(userRequestedDist)}"</strong> have already been allocated. 
                     Please contact the developers or check back later.
                   </p>
                 </div>

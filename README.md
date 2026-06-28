@@ -7,68 +7,64 @@ A secure, high-performance, single-page web application to distribute Google Pla
 ## ⚡ 1-Click Vercel Deploy
 
 Deploy your own private instance of this distributor instantly using the Vercel Clone template.
-
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyour-github-username%2Fyour-repository-name&env=GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,DEVELOPER_EMAILS,JWT_SECRET&stores=postgres)
 
 > **Note**: Before clicking the deploy button, you should **fork or copy** this repository to your own GitHub account, then replace the `repository-url` encoded value in the URL above with your own GitHub repo link!
 
 ---
 
-## 🚀 Setup & Configuration
+## 🚀 Setup & Configuration (2-Step Process)
 
-When deploying to Vercel, you will be prompted to configure the following environment variables:
+To solve the "chicken-and-egg" dependency of Google OAuth (needing your deployed domain URL *before* generating Google keys), setup is split into a simple **2-Step process**. You do **not** need your actual Google Client ID or Secret for the initial deployment.
 
-| Variable | Description |
-|---|---|
-| `POSTGRES_URL` | Automatically provisioned and injected by Vercel when selecting the Postgres Store. |
-| `GOOGLE_CLIENT_ID` | Your Google OAuth Client ID (obtained from Google Cloud Console). |
-| `GOOGLE_CLIENT_SECRET` | Your Google OAuth Client Secret. |
-| `DEVELOPER_EMAILS` | Comma-separated list of whitelisted developer/admin emails (e.g. `admin@example.com,dev@example.com`). |
-| `JWT_SECRET` | A long random string (e.g. `32+ characters`) used to sign secure session cookies. |
+### Step 1: Initial Deploy (Using Placeholders)
+1. Click the **Deploy with Vercel** button above.
+2. Vercel will prompt you for the environment variables. Fill them in as follows:
+   * `GOOGLE_CLIENT_ID`: Enter `placeholder`
+   * `GOOGLE_CLIENT_SECRET`: Enter `placeholder`
+   * `DEVELOPER_EMAILS`: Enter your Google email address (e.g. `yourname@gmail.com`)
+   * `JWT_SECRET`: Type a long random string of gibberish characters (used to sign session cookies securely)
+3. Click **Deploy**. Vercel will build the project and automatically provision the Postgres database.
+4. Once completed, Vercel will show your live site URL (e.g., `https://your-project-name.vercel.app`). **Copy this URL**.
 
-### Step 1: Initialize the Postgres Database
-Once Vercel finishes deploying the project:
-1. Go to your **Vercel Dashboard** and select the deployed project.
-2. Click the **Storage** tab and select your newly provisioned Postgres database.
-3. Click **Query** in the sidebar.
-4. Paste the contents of [infra/migration.sql](infra/migration.sql):
-   ```sql
-   CREATE TABLE IF NOT EXISTS promo_codes (
-       id SERIAL PRIMARY KEY,
-       code TEXT UNIQUE NOT NULL,
-       claimed_by_email TEXT DEFAULT NULL,
-       claimed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
-   );
-   CREATE INDEX IF NOT EXISTS idx_promo_codes_email ON promo_codes(claimed_by_email);
-   ```
-5. Click **Run**. The database tables are now set up.
-
-### Step 2: Configure Google OAuth Redirect Callback
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Select your project and navigate to **APIs & Services** -> **Credentials**.
-3. Create or Edit an **OAuth 2.0 Client ID** (Web Application type).
-4. Under **Authorized redirect URIs**, add your Vercel deployment domain with the auth callback suffix:
-   - `https://your-app-name.vercel.app/api/auth/callback`
-   - *Tip: You can also add `http://localhost:3000/api/auth/callback` for local development testing.*
-5. Copy your Client ID and Client Secret, and update your Vercel Environment Variables if you haven't already.
+### Step 2: Swap Placeholders for Real Google Keys
+1. Go to your [Google Cloud Console](https://console.cloud.google.com/).
+2. Create or select a project, then navigate to **APIs & Services** -> **Credentials**.
+3. Click **Create Credentials** -> **OAuth client ID** (select **Web Application**).
+4. Under **Authorized redirect URIs**, add your copied Vercel URL with the `/api/auth/callback` suffix:
+   - `https://your-project-name.vercel.app/api/auth/callback`
+   - *(Optional: Add `http://localhost:3000/api/auth/callback` if you plan to test locally)*
+5. Google will generate your real **Client ID** and **Client Secret**. Copy them.
+6. Go back to your **Vercel Project Dashboard** -> **Settings** -> **Environment Variables**:
+   - Edit `GOOGLE_CLIENT_ID` and paste the real ID.
+   - Edit `GOOGLE_CLIENT_SECRET` and paste the real Secret.
+   - Click **Save**.
+7. Navigate to the **Deployments** tab on Vercel, click the three dots next to your last deployment, and select **Redeploy** to apply the active keys.
 
 ---
 
-## 🛠️ Local Development
+## 🛠️ Local Development (Zero-Config Demo Mode)
 
-To run this project locally, clone your repository and setup your environment:
+You can run and test the entire application locally with **zero configuration**—no database setup or Google Console credentials required.
 
-1. Create a `.env` file in the root folder:
-   ```bash
-   cp .env.example .env
-   ```
-2. Populate the `.env` file with your local database URL (or Vercel Postgres credentials) and Google OAuth details.
-3. Install dependencies and start the development server:
+### 1-Click Local Run:
+1. Install dependencies and start the development server:
    ```bash
    npm install
    npm run dev
    ```
-4. Open [http://localhost:3000](http://localhost:3000) to view the application.
+2. Open [http://localhost:3000](http://localhost:3000) in your browser.
+3. The app will detect the missing configuration and offer **Demo Mode** buttons. Click **⚡ Log in as Admin** or **👤 Log in as Tester** to instantly test the dashboards!
+
+*How it works*: In Demo Mode, the server simulates authentication and intercepts database queries to read/write records in a local `db.json` file in the project root.
+
+---
+
+### Running with Real Databases:
+If you want to test with real database connections and actual Google logins locally:
+1. Copy `.env.example` to `.env` and fill in your connection credentials.
+2. Initialize Postgres tables by executing [infra/migration.sql](infra/migration.sql) inside your database query console.
+3. Configure `http://localhost:3000/api/auth/callback` as an **Authorized redirect URI** in your Google Cloud Console.
 
 ---
 
