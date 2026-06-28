@@ -394,6 +394,32 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
     </div>
   );
 
+  // 5. Common Footer
+  const renderFooter = (systemText) => {
+    const gameName = process.env.NEXT_PUBLIC_GAME_NAME;
+    const gameUrl = process.env.NEXT_PUBLIC_GAME_URL || '#';
+
+    return (
+      <footer>
+        {gameName && (
+          <div style={{ marginBottom: '0.5rem' }}>
+            Built by the creator of{' '}
+            <a 
+              href={gameUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              style={{ color: 'var(--primary)', fontWeight: '600', textDecoration: 'underline' }}
+            >
+              {gameName}
+            </a>
+            . Go wish-list it on the Play Store!
+          </div>
+        )}
+        Closed-Test Code Distributor System • {systemText}
+      </footer>
+    );
+  };
+
   // Active Statistics mapping for currently selected campaign
   const activeStat = campaignsStats.find(s => s.dist_slug === selectedDist) || { total: 0, claimed: 0, remaining: 0 };
   const userRequestedDist = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('dist') || 'default' : 'default';
@@ -442,12 +468,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
               </a>
             </div>
           </div>
-          <footer>
-            <div style={{ marginBottom: '0.5rem' }}>
-              Built by the creator of <a href="#" style={{ color: 'var(--primary)', fontWeight: '600', textDecoration: 'underline' }}>Your Game Name</a>. Go wish-list it on the Play Store!
-            </div>
-            Closed-Test Code Distributor System • Powered by Next.js & Vercel Postgres
-          </footer>
+          {renderFooter('Powered by Next.js & Vercel Postgres')}
         </>
       ) : user.isDeveloper ? (
         /* Developer Dashboard View */
@@ -648,12 +669,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
               </div>
             </div>
           </div>
-          <footer>
-            <div style={{ marginBottom: '0.5rem' }}>
-              Built by the creator of <a href="#" style={{ color: 'var(--primary)', fontWeight: '600', textDecoration: 'underline' }}>Your Game Name</a>. Go wish-list it on the Play Store!
-            </div>
-            Closed-Test Code Distributor System • Developer Panel
-          </footer>
+          {renderFooter('Developer Panel')}
         </>
       ) : (
         /* User Claim View */
@@ -699,12 +715,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
               )}
             </div>
           </div>
-          <footer>
-            <div style={{ marginBottom: '0.5rem' }}>
-              Built by the creator of <a href="#" style={{ color: 'var(--primary)', fontWeight: '600', textDecoration: 'underline' }}>Your Game Name</a>. Go wish-list it on the Play Store!
-            </div>
-            Closed-Test Code Distributor System
-          </footer>
+          {renderFooter('Powered by Next.js & Vercel Postgres')}
         </>
       )}
     </div>
