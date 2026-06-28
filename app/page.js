@@ -35,7 +35,7 @@ export default function Home() {
   
   // Developer statistics lists and filters
   const [campaignsStats, setCampaignsStats] = useState([]);
-  const [selectedDist, setSelectedDist] = useState('default');
+  const [selectedDist, setSelectedDist] = useState('');
   const [claimsList, setClaimsList] = useState([]);
   
   const [actionLoading, setActionLoading] = useState(false);
@@ -151,7 +151,7 @@ export default function Home() {
   };
 
   const loadAdminDashboardData = async (distSlug) => {
-    if (!distSlug) {
+    if (!distSlug || distSlug === 'default') {
       setSelectedDist('');
       setClaimsList([]);
       return;
