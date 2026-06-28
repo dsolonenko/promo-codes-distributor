@@ -17,8 +17,6 @@ Deploy your own instance of this distributor using the Vercel Clone template.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdsolonenko%2Fpromo-codes-distributor&env=GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,DEVELOPER_EMAILS,JWT_SECRET&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D)
 
-> **Important**: Fork or copy this repository to your own GitHub account first, then replace the `repository-url` value in the deploy link with your repository URL.
-
 ### Setup Process
 
 Since Google OAuth requires your deployed domain URL *before* generating credentials, deployment is a 2-step process.
