@@ -16,7 +16,7 @@ export async function POST(request) {
     return NextResponse.json(result);
   } catch (err) {
     console.error('Claim Code API Error:', err);
-    return NextResponse.json({ error: 'Database transaction failed: ' + err.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to claim code. Please try again.' }, { status: 500 });
   }
 }
 export const dynamic = 'force-dynamic';

@@ -1,7 +1,21 @@
 import { NextResponse } from 'next/server';
 import { encryptSession } from '@/lib/auth';
 
+function isConfigured() {
+  return (
+    process.env.GOOGLE_CLIENT_ID &&
+    process.env.GOOGLE_CLIENT_SECRET &&
+    process.env.POSTGRES_URL &&
+    !process.env.GOOGLE_CLIENT_ID.includes('your-google-client-id') &&
+    !process.env.POSTGRES_URL.includes('postgres://username')
+  );
+}
+
 export async function POST(request) {
+  if (isConfigured()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   try {
     const { email } = await request.json();
     const cleanEmail = email ? String(email).trim().toLowerCase() : 'tester@example.com';
@@ -28,7 +42,8 @@ export async function POST(request) {
 
     return response;
   } catch (err) {
-    return NextResponse.json({ error: 'Demo authentication failed: ' + err.message }, { status: 500 });
+    console.error('Demo login error:', err);
+    return NextResponse.json({ error: 'Demo authentication failed' }, { status: 500 });
   }
 }
 export const dynamic = 'force-dynamic';

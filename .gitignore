@@ -38,6 +38,9 @@ yarn-error.log*
 .env.production
 !.env.example
 
+# local database (development only — never commit real codes)
+db.json
+
 # vercel
 .vercel
 

@@ -22,8 +22,8 @@ export async function GET(request) {
     return NextResponse.json(result);
   } catch (err) {
     console.error('Fetch Claimed Codes Error:', err);
-    const status = err.message.includes('Forbidden') ? 403 : 500;
-    return NextResponse.json({ error: err.message }, { status });
+    if (err.message.includes('Forbidden')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Failed to fetch codes' }, { status: 500 });
   }
 }
 
@@ -40,8 +40,9 @@ export async function POST(request) {
     return NextResponse.json(result);
   } catch (err) {
     console.error('Bulk Upload Error:', err);
-    const status = err.message.includes('Forbidden') ? 403 : err.message.includes('Invalid') ? 400 : 500;
-    return NextResponse.json({ error: err.message }, { status });
+    if (err.message.includes('Forbidden')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (err.message.includes('Invalid') || err.message.includes('No valid')) return NextResponse.json({ error: err.message }, { status: 400 });
+    return NextResponse.json({ error: 'Failed to upload codes' }, { status: 500 });
   }
 }
 
@@ -58,8 +59,9 @@ export async function DELETE(request) {
     return NextResponse.json(result);
   } catch (err) {
     console.error('Purge Codes Error:', err);
-    const status = err.message.includes('Forbidden') ? 403 : err.message.includes('Missing') ? 400 : 500;
-    return NextResponse.json({ error: err.message }, { status });
+    if (err.message.includes('Forbidden')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (err.message.includes('Missing')) return NextResponse.json({ error: err.message }, { status: 400 });
+    return NextResponse.json({ error: 'Failed to clear campaign' }, { status: 500 });
   }
 }
 export const dynamic = 'force-dynamic';

@@ -15,8 +15,8 @@ export async function GET(request) {
     return NextResponse.json(result);
   } catch (err) {
     console.error('Fetch Stats API Error:', err);
-    const status = err.message.includes('Forbidden') ? 403 : 500;
-    return NextResponse.json({ error: err.message }, { status });
+    if (err.message.includes('Forbidden')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
   }
 }
 export const dynamic = 'force-dynamic';

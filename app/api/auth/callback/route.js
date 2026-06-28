@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server';
 import { encryptSession } from '@/lib/auth';
 
+function getOrigin(request) {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+  const host = request.headers.get('host') || 'localhost:3000';
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  return `${protocol}://${host}`;
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  
-  const host = request.headers.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  const origin = `${protocol}://${host}`;
+
+  const origin = getOrigin(request);
   const redirectUri = `${origin}/api/auth/callback`;
 
   if (!code) {
@@ -28,18 +33,30 @@ export async function GET(request) {
     });
 
     if (!tokenRes.ok) {
-      const errorText = await tokenRes.text();
-      throw new Error(`Google token exchange failed: ${errorText}`);
+      console.error('Google token exchange failed:', await tokenRes.text());
+      throw new Error('Google authentication failed');
     }
 
     const tokenData = await tokenRes.json();
-    
-    // Parse Google's ID Token (JWT)
-    const parts = tokenData.id_token.split('.');
-    if (parts.length !== 3) {
-      throw new Error('Invalid JWT signature returned by Google.');
+
+    // Verify the ID token with Google's servers (validates signature, expiry, and audience)
+    const tokenInfoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${tokenData.id_token}`
+    );
+    if (!tokenInfoRes.ok) {
+      throw new Error('Google ID token verification failed');
     }
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    const payload = await tokenInfoRes.json();
+
+    // Ensure the token was issued for our app, not a different OAuth client
+    if (payload.aud !== process.env.GOOGLE_CLIENT_ID) {
+      throw new Error('Token audience mismatch');
+    }
+
+    // Reject identities whose email Google has not verified
+    if (payload.email_verified !== 'true' && payload.email_verified !== true) {
+      throw new Error('Email address is not verified by Google');
+    }
 
     if (!payload.email) {
       throw new Error('Google identity did not return an email address.');
@@ -65,7 +82,7 @@ export async function GET(request) {
     return response;
   } catch (err) {
     console.error('OAuth Callback Error:', err);
-    return NextResponse.redirect(new URL(`/?error=${encodeURIComponent(err.message)}`, origin));
+    return NextResponse.redirect(new URL('/?error=auth_failed', origin));
   }
 }
 export const dynamic = 'force-dynamic';

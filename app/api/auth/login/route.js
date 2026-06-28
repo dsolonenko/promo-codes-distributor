@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 
-export async function GET(request) {
+function getOrigin(request) {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
   const host = request.headers.get('host') || 'localhost:3000';
   const protocol = host.includes('localhost') ? 'http' : 'https';
-  const origin = `${protocol}://${host}`;
+  return `${protocol}://${host}`;
+}
+
+export async function GET(request) {
+  const origin = getOrigin(request);
   const redirectUri = `${origin}/api/auth/callback`;
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
