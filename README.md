@@ -25,13 +25,18 @@ Since Google OAuth requires your deployed domain URL *before* generating credent
 
 #### Step 1: Deploy with placeholders
 1. Click the **Deploy with Vercel** button above.
-2. Fill in the environment variables on Vercel:
+2. Vercel will prompt you to clone the template. Enter a repository name (e.g., `beta-code-distributor`) and click **Create** (keep it set to private).
+3. Under the **Add Products (Storage)** step, click the **Add** button next to **Neon Serverless Postgres**:
+   * Select a database region close to your users.
+   * Leave the **Custom Prefix** field completely blank (our code expects the default `POSTGRES_URL`).
+   * Click **Connect** to link the database.
+4. Fill in the environment variables:
    * `GOOGLE_CLIENT_ID`: Enter `placeholder`
    * `GOOGLE_CLIENT_SECRET`: Enter `placeholder`
    * `DEVELOPER_EMAILS`: Enter your Google email address (e.g., `yourname@gmail.com`)
-   * `JWT_SECRET`: Enter any long random string of characters
-3. Click **Deploy**. Vercel will build the project and provision your database.
-4. Copy your live site URL once deployment completes (e.g., `https://your-app.vercel.app`).
+   * `JWT_SECRET`: Enter any long random string of characters (for cookie signing)
+5. Click **Deploy**. Vercel will build the project and connect your database automatically.
+6. Copy your live site URL once the deployment completes (e.g., `https://your-app.vercel.app`).
 
 #### Step 2: Add Google Credentials
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
