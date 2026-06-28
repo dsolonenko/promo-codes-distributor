@@ -51,6 +51,16 @@ Since Google OAuth requires your deployed domain URL *before* generating credent
    * Click **Save**.
 7. Go to Vercel -> **Deployments** -> click the three dots on your last deployment -> **Redeploy**.
 
+#### Step 3: Access the Portal & Create a Campaign
+1. Open your live app's root URL (e.g., `https://your-app.vercel.app`) in your browser.
+2. Sign in with Google using one of the email addresses whitelisted in your `DEVELOPER_EMAILS` environment variable.
+3. You will be redirected to the **Developer Dashboard**.
+4. To create your first campaign:
+   * Enter a campaign name (e.g., `Launch Promo` or `Alpha Phase 1`) under **Create Distribution Campaign** and click **Create**.
+   * Select your new campaign from the dashboard dropdown list.
+   * Drag-and-drop your promo codes CSV file (or paste plain text codes) to import them.
+5. Copy the generated **Share URL** from the dashboard and distribute it directly to your users so they can claim their codes!
+
 ---
 
 ## Local Development

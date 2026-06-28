@@ -20,6 +20,8 @@ export default function Home() {
   const [newCampaignName, setNewCampaignName] = useState('');
   const [showCreateInput, setShowCreateInput] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [urlDist, setUrlDist] = useState('default');
+  const [isMounted, setIsMounted] = useState(false);
   
   const fileInputRef = useRef(null);
 
@@ -59,6 +61,12 @@ export default function Home() {
 
   // 1. Session check and routing on mount
   useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const dist = searchParams.get('dist') || 'default';
+      setUrlDist(dist);
+    }
     fetchSession();
   }, []);
 
@@ -422,7 +430,8 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
 
   // Active Statistics mapping for currently selected campaign
   const activeStat = campaignsStats.find(s => s.dist_slug === selectedDist) || { total: 0, claimed: 0, remaining: 0 };
-  const userRequestedDist = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('dist') || 'default' : 'default';
+  const userRequestedDist = urlDist;
+  const isRootPage = urlDist === 'default';
 
   return (
     <div className="container">
@@ -434,29 +443,60 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
         <>
           <div className="landing-container">
             <div className="hero-text">
-              <h1>Beta Promo Code Delivery</h1>
+              <h1>
+                {isRootPage 
+                  ? 'Developer Dashboard' 
+                  : `${getFriendlyName(urlDist)} Promo Code`}
+              </h1>
               <p>
-                Sign in with your Google account to claim your promo code and join our beta test.
+                {isRootPage
+                  ? 'Access your code distributor dashboard. Sign in using your developer credentials to manage campaigns.'
+                  : `Sign in with your Google account to claim your promo code for "${getFriendlyName(urlDist)}".`}
               </p>
               <div className="feature-list">
-                <div className="feature-item">
-                  <span className="feature-check">✓</span>
-                  <span>Instant code claiming</span>
-                </div>
-                <div className="feature-item">
-                  <span className="feature-check">✓</span>
-                  <span>One-click delivery</span>
-                </div>
-                <div className="feature-item">
-                  <span className="feature-check">✓</span>
-                  <span>Redeem directly on Google Play</span>
-                </div>
+                {isRootPage ? (
+                  <>
+                    <div className="feature-item">
+                      <span className="feature-check">✓</span>
+                      <span>Manage multiple campaigns separately</span>
+                    </div>
+                    <div className="feature-item">
+                      <span className="feature-check">✓</span>
+                      <span>Real-time claim statistics</span>
+                    </div>
+                    <div className="feature-item">
+                      <span className="feature-check">✓</span>
+                      <span>Drag-and-drop CSV importer</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="feature-item">
+                      <span className="feature-check">✓</span>
+                      <span>Instant code claiming</span>
+                    </div>
+                    <div className="feature-item">
+                      <span className="feature-check">✓</span>
+                      <span>One-click delivery</span>
+                    </div>
+                    <div className="feature-item">
+                      <span className="feature-check">✓</span>
+                      <span>Redeem directly on Google Play</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             <div className="landing-auth-card card">
               <div className="brand-icon" style={{ width: '50px', height: '50px', fontSize: '1.5rem', marginBottom: '0.5rem' }}>📦</div>
-              <h2>Join the Beta</h2>
-              <p>Sign in to claim your key instantly.</p>
+              <h2>
+                {isRootPage ? 'Developer Login' : getFriendlyName(urlDist)}
+              </h2>
+              <p>
+                {isRootPage 
+                  ? 'Sign in to access your panel.' 
+                  : 'Sign in to claim your promo code instantly.'}
+              </p>
               <a href="/api/auth/login" className="btn btn-google btn-primary" style={{ background: 'white', color: '#1f2937', border: '1px solid #d1d5db', width: '100%' }}>
                 <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -561,7 +601,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', wordBreak: 'break-all' }}>
                 <strong>Share URL: </strong> 
                 <code style={{ color: 'var(--accent)' }}>
-                  {typeof window !== 'undefined' ? `${window.location.origin}/?dist=${selectedDist}` : `/?dist=${selectedDist}`}
+                  {isMounted ? `${window.location.origin}/?dist=${selectedDist}` : `/?dist=${selectedDist}`}
                 </code>
               </div>
             </div>
@@ -676,7 +716,17 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
         <>
           <div className="user-container">
             <div className="card">
-              {claimedCode ? (
+              {isRootPage ? (
+                /* Block root access for non-admins */
+                <div className="empty-state">
+                  <div className="empty-icon" style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚫</div>
+                  <h2>Access Denied</h2>
+                  <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', lineHeight: '1.5', marginBottom: '1.5rem' }}>
+                    Please use the campaign link provided by the developer to claim your code.
+                  </p>
+                  <a href="/api/auth/logout" className="btn btn-secondary" style={{ width: '100%' }}>Sign Out</a>
+                </div>
+              ) : claimedCode ? (
                 <>
                   <div className="claim-header">
                     <h1>Claim Success!</h1>
