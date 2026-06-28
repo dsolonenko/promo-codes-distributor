@@ -3,6 +3,30 @@
 import { useState, useEffect, useRef } from 'react';
 import { extractCodesFromText } from '@/lib/csv';
 
+// Reusable Premium Vector SVG Icons
+const TicketIcon = ({ size = 20 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+    <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+    <path d="M13 5v14" strokeDasharray="3 3" />
+  </svg>
+);
+
+const ShieldAlertIcon = ({ size = 48 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="var(--error)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
+
+const AlertTriangleIcon = ({ size = 48 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
 export default function Home() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -372,11 +396,13 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
     return (
       <header>
         <div className="brand">
-          <div className="brand-icon">📦</div>
+          <div className="brand-icon">
+            <TicketIcon size={18} />
+          </div>
           <span className="brand-title">Code Distributor</span>
           {user.demoMode && (
-            <span className="user-email" style={{ borderColor: 'var(--warning)', color: 'var(--warning)', marginLeft: '0.75rem', fontSize: '0.7rem', padding: '0.2rem 0.5rem', fontWeight: 'bold' }}>
-              ⚠️ DEMO MODE
+            <span className="user-email" style={{ borderColor: 'var(--warning)', color: 'var(--warning)', marginLeft: '0.75rem', fontSize: '0.7rem', padding: '0.2rem 0.5rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <span style={{ fontSize: '0.8rem' }}>⚠️</span> DEMO MODE
             </span>
           )}
         </div>
@@ -392,9 +418,26 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
   const renderToasts = () => (
     <div className="toast-container">
       {toasts.map((t) => (
-        <div key={t.id} className={`toast toast-${t.type}`}>
-          <div style={{ fontSize: '1.25rem' }}>
-            {t.type === 'success' ? '⚡' : t.type === 'error' ? '❌' : 'ℹ️'}
+        <div key={t.id} className={`toast toast-${t.type}`} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            {t.type === 'success' ? (
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            ) : t.type === 'error' ? (
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            )}
           </div>
           <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{t.message}</div>
         </div>
@@ -488,7 +531,9 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
               </div>
             </div>
             <div className="landing-auth-card card">
-              <div className="brand-icon" style={{ width: '50px', height: '50px', fontSize: '1.5rem', marginBottom: '0.5rem' }}>📦</div>
+              <div className="brand-icon" style={{ width: '50px', height: '50px', marginBottom: '0.5rem' }}>
+                <TicketIcon size={24} />
+              </div>
               <h2>
                 {isRootPage ? 'Developer Login' : getFriendlyName(urlDist)}
               </h2>
@@ -719,7 +764,9 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
               {isRootPage ? (
                 /* Block root access for non-admins */
                 <div className="empty-state">
-                  <div className="empty-icon" style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚫</div>
+                  <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+                    <ShieldAlertIcon size={48} />
+                  </div>
                   <h2>Access Denied</h2>
                   <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', lineHeight: '1.5', marginBottom: '1.5rem' }}>
                     Please use the campaign link provided by the developer to claim your code.
@@ -755,7 +802,9 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
                 </>
               ) : (
                 <div className="empty-state">
-                  <div className="empty-icon">⚠️</div>
+                  <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+                    <AlertTriangleIcon size={48} />
+                  </div>
                   <h2>No Promo Codes Available</h2>
                   <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', lineHeight: '1.5' }}>
                     All promo codes for the campaign <strong>"{getFriendlyName(userRequestedDist)}"</strong> have already been allocated. 
