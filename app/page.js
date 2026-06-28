@@ -466,7 +466,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
             . Go wish-list it on the Play Store!
           </div>
         )}
-        <div>Beta Code Distributor{systemText === 'Developer Panel' ? ' • Developer Panel' : ''}</div>
+        <div>Code Distributor{systemText === 'Developer Panel' ? ' • Developer Panel' : ''}</div>
       </footer>
     );
   };
