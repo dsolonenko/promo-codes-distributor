@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📦 Closed-Test Promo Code Distributor (Next.js + Vercel Postgres)
 
-## Getting Started
+A secure, high-performance, single-page web application to distribute Google Play promo codes for your closed beta programs. It uses Google OAuth to authenticate users, matches them to a unique code, and prevents double-allocation using an atomic database row lock (`FOR UPDATE SKIP LOCKED`).
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## ⚡ 1-Click Vercel Deploy
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Deploy your own private instance of this distributor instantly using the Vercel Clone template.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyour-github-username%2Fyour-repository-name&env=GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,DEVELOPER_EMAILS,JWT_SECRET&stores=postgres)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> **Note**: Before clicking the deploy button, you should **fork or copy** this repository to your own GitHub account, then replace the `repository-url` encoded value in the URL above with your own GitHub repo link!
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🚀 Setup & Configuration
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+When deploying to Vercel, you will be prompted to configure the following environment variables:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Variable | Description |
+|---|---|
+| `POSTGRES_URL` | Automatically provisioned and injected by Vercel when selecting the Postgres Store. |
+| `GOOGLE_CLIENT_ID` | Your Google OAuth Client ID (obtained from Google Cloud Console). |
+| `GOOGLE_CLIENT_SECRET` | Your Google OAuth Client Secret. |
+| `DEVELOPER_EMAILS` | Comma-separated list of whitelisted developer/admin emails (e.g. `admin@example.com,dev@example.com`). |
+| `JWT_SECRET` | A long random string (e.g. `32+ characters`) used to sign secure session cookies. |
 
-## Deploy on Vercel
+### Step 1: Initialize the Postgres Database
+Once Vercel finishes deploying the project:
+1. Go to your **Vercel Dashboard** and select the deployed project.
+2. Click the **Storage** tab and select your newly provisioned Postgres database.
+3. Click **Query** in the sidebar.
+4. Paste the contents of [infra/migration.sql](infra/migration.sql):
+   ```sql
+   CREATE TABLE IF NOT EXISTS promo_codes (
+       id SERIAL PRIMARY KEY,
+       code TEXT UNIQUE NOT NULL,
+       claimed_by_email TEXT DEFAULT NULL,
+       claimed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
+   );
+   CREATE INDEX IF NOT EXISTS idx_promo_codes_email ON promo_codes(claimed_by_email);
+   ```
+5. Click **Run**. The database tables are now set up.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Step 2: Configure Google OAuth Redirect Callback
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Select your project and navigate to **APIs & Services** -> **Credentials**.
+3. Create or Edit an **OAuth 2.0 Client ID** (Web Application type).
+4. Under **Authorized redirect URIs**, add your Vercel deployment domain with the auth callback suffix:
+   - `https://your-app-name.vercel.app/api/auth/callback`
+   - *Tip: You can also add `http://localhost:3000/api/auth/callback` for local development testing.*
+5. Copy your Client ID and Client Secret, and update your Vercel Environment Variables if you haven't already.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🛠️ Local Development
+
+To run this project locally, clone your repository and setup your environment:
+
+1. Create a `.env` file in the root folder:
+   ```bash
+   cp .env.example .env
+   ```
+2. Populate the `.env` file with your local database URL (or Vercel Postgres credentials) and Google OAuth details.
+3. Install dependencies and start the development server:
+   ```bash
+   npm install
+   npm run dev
+   ```
+4. Open [http://localhost:3000](http://localhost:3000) to view the application.
+
+---
+
+## 🔒 Security & Concurrency Safety
+
+1. **Atomic Lock**: In `/api/claim/route.js`, claiming a promo code executes an atomic select-and-update query utilizing PostgreSQL's `FOR UPDATE SKIP LOCKED` syntax. This ensures that even during high concurrent traffic spikes, no code is ever distributed to two users.
+2. **Access Control**: Session state is signed and encrypted into a secure `httpOnly` cookie via Node.js's native `crypto` module. Stats lookups, uploads, and purges require session validation checking against the `DEVELOPER_EMAILS` whitelist. Normal claimants are barred from accessing codes that do not belong to them.
