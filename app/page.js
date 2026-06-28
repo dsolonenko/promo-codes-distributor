@@ -714,7 +714,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
                     </div>
                     
                     <div 
-                      className={`upload-zone ${dragActive ? 'active' : ''}`}
+                      className={`upload-area ${dragActive ? 'dragover' : ''}`}
                       onDragEnter={handleDrag}
                       onDragOver={handleDrag}
                       onDragLeave={handleDrag}
@@ -729,11 +729,24 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
                         disabled={actionLoading}
                         style={{ display: 'none' }}
                       />
-                      <div className="upload-icon">📥</div>
-                      <div className="upload-text">
-                        <span>Click to upload</span> or drag and drop
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', pointerEvents: 'none' }}>
+                        <div style={{ fontSize: '2rem', display: 'flex', justifyContent: 'center' }}>
+                          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.8 }}>
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                          </svg>
+                        </div>
+                        <button className="btn btn-primary" style={{ margin: '0.25rem 0', pointerEvents: 'none' }}>
+                          Select CSV / TXT File
+                        </button>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          or drag and drop your file here
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                          Accepts Google Play CSV or TXT exports
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Accepts CSV or TXT exports from Google Play</div>
                     </div>
 
                     <div className="divider">Or paste codes manually</div>
