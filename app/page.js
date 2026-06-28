@@ -415,7 +415,7 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
             . Go wish-list it on the Play Store!
           </div>
         )}
-        Closed-Test Code Distributor System • {systemText}
+        <div>Beta Code Distributor{systemText === 'Developer Panel' ? ' • Developer Panel' : ''}</div>
       </footer>
     );
   };
@@ -434,29 +434,29 @@ JWT_SECRET=your-custom-jwt-secret-key</pre>
         <>
           <div className="landing-container">
             <div className="hero-text">
-              <h1>Closed-Testing Code Delivery</h1>
+              <h1>Beta Promo Code Delivery</h1>
               <p>
-                Authenticate securely using your Google account to claim your unique promo code for the closed beta program.
+                Sign in with your Google account to claim your promo code and join our beta test.
               </p>
               <div className="feature-list">
                 <div className="feature-item">
                   <span className="feature-check">✓</span>
-                  <span>Instant promo code generation</span>
+                  <span>Instant code claiming</span>
                 </div>
                 <div className="feature-item">
                   <span className="feature-check">✓</span>
-                  <span>Double-allocation protection using atomic isolation</span>
+                  <span>One-click delivery</span>
                 </div>
                 <div className="feature-item">
                   <span className="feature-check">✓</span>
-                  <span>Direct integration with Google Play Console</span>
+                  <span>Redeem directly on Google Play</span>
                 </div>
               </div>
             </div>
             <div className="landing-auth-card card">
               <div className="brand-icon" style={{ width: '50px', height: '50px', fontSize: '1.5rem', marginBottom: '0.5rem' }}>📦</div>
-              <h2>Join the Closed Beta</h2>
-              <p>Sign in to register your testing account and claim your key.</p>
+              <h2>Join the Beta</h2>
+              <p>Sign in to claim your key instantly.</p>
               <a href="/api/auth/login" className="btn btn-google btn-primary" style={{ background: 'white', color: '#1f2937', border: '1px solid #d1d5db', width: '100%' }}>
                 <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
