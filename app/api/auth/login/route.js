@@ -22,7 +22,7 @@ export async function GET(request) {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'email profile',
+    scope: 'email',
     access_type: 'online',
     prompt: 'select_account'
   }).toString();
