@@ -11,12 +11,14 @@ function getOrigin(request) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
+  const state = searchParams.get('state') || 'default';
 
   const origin = getOrigin(request);
   const redirectUri = `${origin}/api/auth/callback`;
 
   if (!code) {
-    return NextResponse.redirect(new URL('/?error=no_auth_code', origin));
+    const errorPath = state && state !== 'default' ? `/?dist=${state}&error=no_auth_code` : '/?error=no_auth_code';
+    return NextResponse.redirect(new URL(errorPath, origin));
   }
 
   try {
@@ -71,7 +73,8 @@ export async function GET(request) {
 
     const cookieValue = encryptSession(sessionData);
 
-    const response = NextResponse.redirect(new URL('/', origin));
+    const targetPath = state && state !== 'default' ? `/?dist=${state}` : '/';
+    const response = NextResponse.redirect(new URL(targetPath, origin));
     response.cookies.set('auth_session', cookieValue, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -82,7 +85,8 @@ export async function GET(request) {
     return response;
   } catch (err) {
     console.error('OAuth Callback Error:', err);
-    return NextResponse.redirect(new URL('/?error=auth_failed', origin));
+    const errorPath = state && state !== 'default' ? `/?dist=${state}&error=auth_failed` : '/?error=auth_failed';
+    return NextResponse.redirect(new URL(errorPath, origin));
   }
 }
 export const dynamic = 'force-dynamic';

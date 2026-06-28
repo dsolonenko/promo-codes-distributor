@@ -18,13 +18,17 @@ export async function GET(request) {
     }, { status: 500 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const dist = searchParams.get('dist') || '';
+
   const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'email',
     access_type: 'online',
-    prompt: 'select_account'
+    prompt: 'select_account',
+    state: dist || 'default'
   }).toString();
 
   return NextResponse.redirect(googleAuthUrl);
